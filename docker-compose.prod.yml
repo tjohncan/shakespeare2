@@ -1,0 +1,83 @@
+# =============================================================================
+# docker-compose.prod.yml — Overlay for self-hosted TLS deployment.
+#
+# Usage (one-time setup on a fresh host):
+#
+#   1. Point your DNS A record at this host before anything else (certbot
+#      needs the domain to resolve here for the HTTP-01 challenge).
+#
+#   2. Fill in .env: DOMAIN=..., ACME_EMAIL=..., plus the usual app vars.
+#
+#   3. Generate the nginx config from the template:
+#        cd nginx && envsubst '${DOMAIN}' \
+#          < nginx.prod.conf.template > nginx.prod.conf && cd ..
+#
+#   4. Obtain the initial certificate in standalone mode (nothing else on
+#      port 80 yet):
+#        docker run --rm -p 80:80 \
+#          -v /etc/letsencrypt:/etc/letsencrypt \
+#          certbot/certbot certonly --standalone \
+#          -d $DOMAIN --email $ACME_EMAIL \
+#          --agree-tos --non-interactive
+#
+#   5. Bring up the full stack:
+#        docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Everyday re-deploys / rebuilds:
+#
+#      docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Certificate renewal is automatic (certbot checks every 12h; nginx reloads
+# itself every 12h to pick up renewed certs). To force a manual renewal:
+#
+#      docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+#        run --rm certbot renew --webroot -w /var/www/certbot
+#      docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+#        exec nginx nginx -s reload
+#
+# For localhost or ALB-fronted deployments, do NOT include this file — the
+# base docker-compose.yml runs plain HTTP on :80 and assumes TLS (if any)
+# is terminated upstream.
+# =============================================================================
+
+services:
+
+  nginx:
+    # Swap the HTTP-only nginx.conf for the TLS-enabled prod config, open
+    # 443, and mount the letsencrypt + ACME webroot volumes. The periodic
+    # `nginx -s reload` picks up renewed certs without a container restart.
+    command: >
+      /bin/sh -c "while :; do sleep 12h; nginx -s reload; done &
+                  exec nginx -g 'daemon off;'"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - certbot-webroot:/var/www/certbot:ro
+
+  # ---------------------------------------------------------------------------
+  # certbot — Let's Encrypt certificate renewal loop.
+  #
+  # Runs `certbot renew` every 12h. Renewal is a no-op until a cert is within
+  # 30 days of expiry; no rate-limit risk from the loop itself. Initial cert
+  # issuance is a one-shot standalone run before first `compose up` (see
+  # header comment).
+  # ---------------------------------------------------------------------------
+  certbot:
+    image: certbot/certbot:latest
+    container_name: shakespeare2-certbot
+    restart: unless-stopped
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt
+      - certbot-webroot:/var/www/certbot
+    entrypoint: >
+      /bin/sh -c "trap exit TERM;
+                  while :; do
+                    certbot renew --webroot -w /var/www/certbot;
+                    sleep 12h & wait $${!};
+                  done"
+
+volumes:
+  certbot-webroot:

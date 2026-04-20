@@ -1,0 +1,333 @@
+<svg
+  width="512"
+  height="512"
+  viewBox="0 0 512 512"
+  xmlns="http://www.w3.org/2000/svg">
+
+<!-- ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+  shakespeare2 — William Shakespeare via web-skeleton and Web-Sockets
+
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+  PNG and ICO asset pipeline:
+
+    # one-time install of image tools:
+    # sudo apt-get install librsvg2-bin optipng icoutils
+
+    cd favicon
+
+    rsvg-convert -w 16  -h 16  favicon.svg -o favicon-16x16.png
+    rsvg-convert -w 32  -h 32  favicon.svg -o favicon-32x32.png
+    rsvg-convert -w 48  -h 48  favicon.svg -o favicon-48x48.png
+    rsvg-convert -w 64  -h 64  favicon.svg -o favicon-64x64.png
+    rsvg-convert -w 180 -h 180 favicon.svg -o apple-touch-icon.png
+    rsvg-convert -w 192 -h 192 favicon.svg -o icon-192x192.png
+    rsvg-convert -w 512 -h 512 favicon.svg -o icon-512x512.png
+
+    optipng -o7 *.png
+
+    cd ..
+
+    icotool -c -o favicon.ico \
+      favicon/favicon-16x16.png \
+      favicon/favicon-32x32.png \
+      favicon/favicon-48x48.png
+
+-->
+
+  <defs>
+
+    <!-- Deep purple X-ray background gradient.
+         Unused — the ghost floats on pure transparency.
+         Kept as a toggle for the dark-square variant. -->
+    <radialGradient id="bg" cx="0.5" cy="0.42" r="0.62">
+      <stop offset="0%"   stop-color="#2a1a48"/>
+      <stop offset="45%"  stop-color="#120a22"/>
+      <stop offset="100%" stop-color="#030108"/>
+    </radialGradient>
+
+    <!-- Purple spectral glow — for cheek sweeps and jaw underline. -->
+    <filter id="wispPurple" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="10" result="blur"/>
+      <feFlood flood-color="#8050c8" flood-opacity="0.78" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Blue spectral glow — for face features and head hair. -->
+    <filter id="wispBlue" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="6" result="blur"/>
+      <feFlood flood-color="#6080e0" flood-opacity="0.82" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- White-hot spark radial — bright core fading through blue to transparent. -->
+    <radialGradient id="spark">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="8%"   stop-color="#e0f0ff" stop-opacity="0.95"/>
+      <stop offset="25%"  stop-color="#80b0f0" stop-opacity="0.55"/>
+      <stop offset="50%"  stop-color="#5068d0" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#3040a0" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Spectral drip — purple weather-streak, fades in top and bottom. -->
+    <linearGradient id="drip" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#8050c8" stop-opacity="0"/>
+      <stop offset="30%"  stop-color="#8050c8" stop-opacity="0.58"/>
+      <stop offset="80%"  stop-color="#8050c8" stop-opacity="0.38"/>
+      <stop offset="100%" stop-color="#8050c8" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Inscribed-circle clip — unused, kept as a toggle for the dark-circle variant. -->
+    <clipPath id="disc">
+      <circle cx="256" cy="256" r="256"/>
+    </clipPath>
+
+  </defs>
+
+  <!-- ===========================================================
+       POST-PROCESS TRANSFORM
+       Scale 3.2× — the face fills the canvas. Both sparks still
+       fit (brow spark near canvas top, lip spark near bottom).
+       Hair columns are mostly cropped by the side edges, leaving
+       only stub-glow suggesting more hair beyond the frame.
+       Centered on the face vertical axis with a small shift so
+       the eye-line sits just above canvas center for 16×16 tab
+       legibility.
+       =========================================================== -->
+  <g transform="translate(256,256) scale(3.2) translate(-256,-233)">
+
+    <!-- ===========================================================
+         SPECTRAL WEATHER-STREAKS
+         Asymmetric purple rain, heavier on the right.
+         =========================================================== -->
+    <g opacity="0.58">
+      <rect x="296" y="60"  width="3" height="340" fill="url(#drip)"/>
+      <rect x="310" y="98"  width="2" height="310" fill="url(#drip)"/>
+      <rect x="322" y="48"  width="4" height="370" fill="url(#drip)"/>
+      <rect x="334" y="124" width="2" height="270" fill="url(#drip)"/>
+      <rect x="346" y="78"  width="3" height="340" fill="url(#drip)"/>
+      <rect x="358" y="146" width="2" height="240" fill="url(#drip)"/>
+      <rect x="370" y="108" width="3" height="290" fill="url(#drip)"/>
+      <rect x="384" y="174" width="2" height="210" fill="url(#drip)"/>
+      <rect x="398" y="138" width="2" height="250" fill="url(#drip)"/>
+
+      <rect x="190" y="140" width="2" height="260" fill="url(#drip)"/>
+      <rect x="174" y="200" width="2" height="200" fill="url(#drip)"/>
+      <rect x="158" y="240" width="3" height="160" fill="url(#drip)"/>
+      <rect x="140" y="280" width="2" height="130" fill="url(#drip)"/>
+      <rect x="120" y="322" width="2" height="90"  fill="url(#drip)"/>
+
+      <rect x="248" y="340" width="2" height="60"  fill="url(#drip)"/>
+      <rect x="264" y="344" width="2" height="54"  fill="url(#drip)"/>
+    </g>
+
+    <!-- ===========================================================
+         PURPLE-GLOW STROKES
+         Cheek sweeps and jaw underline — imply the lower head
+         silhouette via glow alone, no solid fill.
+         =========================================================== -->
+    <g opacity="0.88">
+      <g filter="url(#wispPurple)">
+        <g fill="none" stroke="#e0c8f4" stroke-linecap="round" stroke-linejoin="round">
+
+          <!-- Cheek sweeps: flare out toward the jaw -->
+          <g stroke-width="4">
+            <path d="M 332,238 C 328,268 322,294 310,314"/>
+            <path d="M 180,242 C 186,268 194,294 208,314"/>
+          </g>
+
+          <!-- Secondary cheek delineation -->
+          <g stroke-width="3">
+            <path d="M 318,270 C 310,290 300,306 290,318"/>
+            <path d="M 196,272 C 204,290 214,306 224,318"/>
+          </g>
+
+          <!-- Jaw underline -->
+          <g stroke-width="3">
+            <path d="M 208,318 C 232,332 286,332 310,320"/>
+          </g>
+
+        </g>
+      </g>
+    </g>
+
+    <!-- ===========================================================
+         DARK HOLLOW EYE VOID
+         Same path as the blue rim stroke below so the rim and
+         glow overlay the fill cleanly with no gap or mismatch.
+         =========================================================== -->
+    <path d="M 278,222 C 288,214 300,213 314,222 C 318,228 314,236 302,240 C 288,242 282,238 278,232 C 276,228 276,224 278,222 Z"
+          fill="#000000"/>
+
+    <!-- ===========================================================
+         BLUE-GLOW FACE FEATURES
+         Hair, forehead wrinkles, brows, eye rim, nose, ears,
+         mustache, mouth, beard.
+         =========================================================== -->
+    <g opacity="0.95">
+      <g filter="url(#wispBlue)">
+        <g fill="none" stroke="#e8ecfa" stroke-linecap="round" stroke-linejoin="round">
+
+          <!-- ============ HEAD HAIR ============ -->
+          <!-- Two straight columns of tapered filled triangles.
+               Each hair has a 4px base at the scalp and a ~15px
+               tip extending outward. The lowest hair on each side
+               aligns with the start of its purple cheek sweep.
+               Right column is intentionally shorter than left
+               (starts further down) for asymmetric breathing. -->
+          <g opacity="0.55">
+            <g fill="#e8ecfa" stroke="none">
+
+              <!-- Right column (x=332, tips at x=347 — clipped at canvas edge) -->
+              <path d="M 332,182 L 332,186 L 347,184 Z"/>
+              <path d="M 332,186 L 332,190 L 347,188 Z"/>
+              <path d="M 332,190 L 332,194 L 347,192 Z"/>
+              <path d="M 332,194 L 332,198 L 347,196 Z"/>
+              <path d="M 332,198 L 332,202 L 347,200 Z"/>
+              <path d="M 332,202 L 332,206 L 347,204 Z"/>
+              <path d="M 332,206 L 332,210 L 347,208 Z"/>
+              <path d="M 332,210 L 332,214 L 347,212 Z"/>
+              <path d="M 332,214 L 332,218 L 347,216 Z"/>
+              <path d="M 332,218 L 332,222 L 347,221 Z"/>
+              <path d="M 332,222 L 332,226 L 347,226 Z"/>
+              <path d="M 332,226 L 332,230 L 347,230 Z"/>
+              <path d="M 332,230 L 332,234 L 347,235 Z"/>
+              <path d="M 332,234 L 332,238 L 347,239 Z"/>
+
+              <!-- Left column (x=180, tips at x=165 — clipped at canvas edge) -->
+              <path d="M 180,154 L 180,158 L 165,154 Z"/>
+              <path d="M 180,158 L 180,162 L 165,159 Z"/>
+              <path d="M 180,162 L 180,166 L 165,163 Z"/>
+              <path d="M 180,166 L 180,170 L 165,168 Z"/>
+              <path d="M 180,170 L 180,174 L 165,172 Z"/>
+              <path d="M 180,174 L 180,178 L 165,176 Z"/>
+              <path d="M 180,178 L 180,182 L 165,180 Z"/>
+              <path d="M 180,182 L 180,186 L 165,184 Z"/>
+              <path d="M 180,186 L 180,190 L 165,188 Z"/>
+              <path d="M 180,190 L 180,194 L 165,192 Z"/>
+              <path d="M 180,194 L 180,198 L 165,196 Z"/>
+              <path d="M 180,198 L 180,202 L 165,200 Z"/>
+              <path d="M 180,202 L 180,206 L 165,204 Z"/>
+              <path d="M 180,206 L 180,210 L 165,208 Z"/>
+              <path d="M 180,210 L 180,214 L 165,212 Z"/>
+              <path d="M 180,214 L 180,218 L 165,216 Z"/>
+              <path d="M 180,218 L 180,222 L 165,220 Z"/>
+              <path d="M 180,222 L 180,226 L 165,225 Z"/>
+              <path d="M 180,226 L 180,230 L 165,230 Z"/>
+              <path d="M 180,230 L 180,234 L 165,234 Z"/>
+              <path d="M 180,234 L 180,238 L 165,239 Z"/>
+              <path d="M 180,238 L 180,242 L 165,243 Z"/>
+
+            </g>
+          </g>
+
+          <!-- ============ FOREHEAD WRINKLES ============ -->
+          <g stroke-width="4">
+            <path d="M 202,152 C 226,140 258,140 288,148 C 306,154 320,158 330,164"/>
+          </g>
+          <g stroke-width="3">
+            <path d="M 208,180 C 230,172 258,172 284,180 C 302,186 314,188 322,188"/>
+          </g>
+
+          <!-- ============ BROWS ============ -->
+          <!-- Single stroke per side. Left brow arches higher;
+               right brow is flatter and tilts down at the outer
+               edge. -->
+          <g stroke-width="5">
+            <path d="M 194,212 C 210,196 230,194 246,206"/>
+            <path d="M 266,206 C 284,198 306,200 322,214"/>
+          </g>
+
+          <!-- ============ RIGHT EYE — hollow socket ============ -->
+          <!-- Asymmetric 4-corner rim; left edge clears the nose line. -->
+          <g stroke-width="4">
+            <path d="M 278,222 C 288,214 300,213 314,222 C 318,228 314,236 302,240 C 288,242 282,238 278,232 C 276,228 276,224 278,222 Z"/>
+          </g>
+
+          <!-- ============ NOSE — two vertical shadow lines ============ -->
+          <!-- Old-masters approach: left shadow runs from above
+               the brow to below the eye; right shadow is longer
+               but ends short of the mustache. The right endpoint
+               sits at y=278 — the golden-ratio point (1/φ ≈
+               0.618) between the left shadow's endpoint at y=252
+               and the mustache upper arc at y≈294. Control
+               points scaled proportionally (×0.905) so the curve
+               keeps its shape. -->
+          <g stroke-width="5">
+            <path d="M 248,204 C 246,222 244,240 242,252"/>
+            <path d="M 268,202 C 270,222 272,253 274,278"/>
+          </g>
+
+          <!-- ============ EARS — thin vertical strips ============ -->
+          <g stroke-width="3">
+            <path d="M 332,248 C 334,264 334,278 330,290"/>
+            <path d="M 180,250 C 176,264 178,280 184,290"/>
+          </g>
+
+          <!-- ============ MUSTACHE ============ -->
+          <!-- Upper arc + drooping wings + interior strands. -->
+          <g stroke-width="4">
+            <path d="M 238,296 C 252,290 266,290 278,296"/>
+            <path d="M 236,300 C 226,316 218,330 214,344"/>
+            <path d="M 280,300 C 290,316 298,330 302,344"/>
+          </g>
+          <g stroke-width="3">
+            <path d="M 244,302 C 240,316 236,328 234,340"/>
+            <path d="M 272,302 C 276,316 280,328 282,340"/>
+            <path d="M 254,302 C 252,316 250,328 252,338"/>
+            <path d="M 262,302 C 264,316 266,328 264,338"/>
+          </g>
+
+          <!-- ============ MOUTH ============ -->
+          <g stroke-width="3">
+            <path d="M 234,316 C 252,320 270,320 282,314"/>
+          </g>
+
+          <!-- ============ BEARD — forked, with inner texture ============ -->
+          <g stroke-width="4">
+            <path d="M 218,320 C 222,340 230,360 240,378"/>
+            <path d="M 234,324 C 236,346 240,362 244,380"/>
+            <path d="M 250,328 C 250,348 250,366 250,382"/>
+            <path d="M 264,328 C 264,348 264,366 264,382"/>
+            <path d="M 280,324 C 278,346 272,362 266,378"/>
+            <path d="M 296,320 C 292,342 284,360 272,376"/>
+          </g>
+          <g stroke-width="2">
+            <path d="M 242,336 C 244,354 246,368 248,378"/>
+            <path d="M 256,338 C 256,356 256,370 256,382"/>
+            <path d="M 270,336 C 270,354 268,368 266,378"/>
+          </g>
+
+        </g>
+      </g>
+    </g>
+
+    <!-- ===========================================================
+         POETIC SPARKS
+         Three energy nodes — brow (big), lip (big), wink (small).
+         =========================================================== -->
+
+    <!-- Brow spark -->
+    <circle cx="256" cy="158" r="150" fill="url(#spark)"/>
+    <circle cx="256" cy="158" r="7"   fill="#ffffff"/>
+
+    <!-- Lip spark -->
+    <circle cx="258" cy="310" r="150" fill="url(#spark)"/>
+    <circle cx="258" cy="310" r="7"   fill="#ffffff"/>
+
+    <!-- Wink spark (viewer's left) -->
+    <circle cx="220" cy="228" r="66"  fill="url(#spark)"/>
+    <circle cx="220" cy="228" r="4"   fill="#ffffff"/>
+
+  </g>
+
+</svg>

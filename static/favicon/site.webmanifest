@@ -1,0 +1,22 @@
+{
+  "id": "/",
+  "name": "__APP_TITLE__",
+  "short_name": "__APP_TITLE__",
+  "start_url": "/",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/favicon/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "theme_color": "#007007",
+  "background_color": "#007007",
+  "display": "standalone"
+}

@@ -1,0 +1,27 @@
+.git
+.gitignore
+.idea
+.claude
+.env
+*.swp
+*.swo
+*~
+Thumbs.db
+.DS_Store
+
+# Compiled SBCL artifacts from host builds (we rebuild in the image)
+*.fasl
+*.lx64fsl
+*.dx64fsl
+*.core
+shakespeare2
+
+# Local volumes
+nginx/certs/
+ollama-data/
+
+# Docker and docs not needed at build time
+Dockerfile
+docker-compose*.yml
+Makefile
+README.md

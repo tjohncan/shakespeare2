@@ -1,0 +1,27 @@
+# Simulates a t3.micro (2 vCPU, 1 GB RAM) for pre-deploy testing.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.micro.yml up -d
+#
+
+services:
+  ollama:
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+
+  ollama-bootstrap:
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 256M
+
+  app:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M

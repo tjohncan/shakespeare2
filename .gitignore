@@ -1,0 +1,28 @@
+# Editor
+.idea/
+.claude/
+*.swp
+*.swo
+*~
+
+# SBCL compiled artifacts
+*.fasl
+*.lx64fsl
+*.dx64fsl
+*.core
+
+# Compiled binary
+shakespeare2
+
+# Secrets / local config
+.env
+nginx/certs/
+# Generated from nginx.prod.conf.template by `make nginx-prod-config`.
+nginx/nginx.prod.conf
+
+# Docker volumes (local dev)
+ollama-data/
+
+# OS
+Thumbs.db
+.DS_Store

@@ -1,0 +1,89 @@
+services:
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  app:
+    build:
+      context: ../                        # parent dir; needs web-skeleton/ as sibling
+      dockerfile: shakespeare2/Dockerfile
+      args:
+        AUTH: "${SHAKESPEARE2_AUTH:-false}"
+    environment:
+      HOST:         "0.0.0.0"
+      PORT:         "8080"
+      OLLAMA_HOST:  "ollama"
+      OLLAMA_PORT:  "11434"
+      OLLAMA_MODEL: "${OLLAMA_MODEL:-dolphin-llama3:8b}"
+      OLLAMA_TEMPERATURE: "${OLLAMA_TEMPERATURE-}"
+      OLLAMA_NUM_PREDICT: "${OLLAMA_NUM_PREDICT-}"
+      SPIRIT_PATH:  "/app/SPIRIT.md"
+      ALLOWED_ORIGINS:  "${ALLOWED_ORIGINS-}"
+      MAX_INPUT_CHARS:  "${MAX_INPUT_CHARS-}"
+      MAX_OUTPUT_CHARS: "${MAX_OUTPUT_CHARS-}"
+      MAX_OUTPUT_LINES: "${MAX_OUTPUT_LINES-}"
+      # Auth (only read when built with AUTH=true)
+      AUTH_SERVER_URL:         "${AUTH_SERVER_URL-}"
+      AUTH_REDIRECT_URI:       "${AUTH_REDIRECT_URI-}"
+      AUTH_CLIENT_ID:          "${AUTH_CLIENT_ID-}"
+      AUTH_CLIENT_KEY_ID:      "${AUTH_CLIENT_KEY_ID-}"
+      AUTH_CLIENT_SECRET:      "${AUTH_CLIENT_SECRET-}"
+      AUTH_SCOPE:              "${AUTH_SCOPE-}"
+      AUTH_RS_ID:              "${AUTH_RS_ID-}"
+      AUTH_RS_KEY_ID:          "${AUTH_RS_KEY_ID-}"
+      AUTH_RS_SECRET:          "${AUTH_RS_SECRET-}"
+      AUTH_POST_LOGOUT_REDIRECT: "${AUTH_POST_LOGOUT_REDIRECT-}"
+      SESSION_COOKIE_NAME:     "${SESSION_COOKIE_NAME-}"
+      SESSION_COOKIE_SECURE:   "${SESSION_COOKIE_SECURE-}"
+      SESSION_TTL_SECONDS:     "${SESSION_TTL_SECONDS-}"
+      # Localhost-only admin API — unset to disable (returns 404).
+      ADMIN_API_TOKEN:         "${ADMIN_API_TOKEN-}"
+    volumes:
+      - ./SPIRIT.md:/app/SPIRIT.md:ro     # hot-swap persona without rebuild
+    depends_on:
+      ollama-bootstrap:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama
+    volumes:
+      - ollama-data:/root/.ollama
+    restart: unless-stopped
+    healthcheck:
+      # `ollama list` hits the local API — a real liveness test, unlike
+      # `ollama --version` which passes before the daemon is listening.
+      test: ["CMD-SHELL", "ollama list > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  # One-shot: waits for ollama to be healthy, then pulls the configured model.
+  # Exits 0 on success; docker-compose promotes `app` once this finishes.
+  ollama-bootstrap:
+    image: ollama/ollama
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "OLLAMA_HOST=http://ollama:11434 ollama pull ${OLLAMA_MODEL:-dolphin-llama3:8b}"
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  ollama-data:
