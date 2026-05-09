@@ -17,18 +17,25 @@
          (shakespeare2::public-path-p "/callback") t)
   (check "public /logout"
          (shakespeare2::public-path-p "/logout") t)
+  (check "public /login"
+         (shakespeare2::public-path-p "/login") t)
   (check "public /healthz"
          (shakespeare2::public-path-p "/healthz") t)
   (check "non-public /"
          (shakespeare2::public-path-p "/") nil)
   (check "non-public /ws"
          (shakespeare2::public-path-p "/ws") nil)
-  ;; public-asset-path-p covers ungated static assets loaded by <link>
-  ;; tags without credentials (favicons, manifest, robots.txt).
+  ;; public-asset-path-p covers ungated static assets loaded by <link> /
+  ;; <script> tags without credentials (favicons, manifest, robots.txt,
+  ;; CSS, preview-shell JS).
   (check "asset /favicon.ico"
          (shakespeare2::public-asset-path-p "/favicon.ico") t)
   (check "asset /robots.txt"
          (shakespeare2::public-asset-path-p "/robots.txt") t)
+  (check "asset /style.css"
+         (shakespeare2::public-asset-path-p "/style.css") t)
+  (check "asset /preview.js"
+         (shakespeare2::public-asset-path-p "/preview.js") t)
   (check "asset /favicon/site.webmanifest"
          (shakespeare2::public-asset-path-p "/favicon/site.webmanifest") t)
   (check "asset /favicon/favicon.svg"
@@ -37,6 +44,18 @@
          (shakespeare2::public-asset-path-p "/faviconX") nil)
   (check "asset reject /"
          (shakespeare2::public-asset-path-p "/") nil)
+  ;; preview-path-p marks the GET paths the public preview shell answers
+  ;; for unauthenticated visitors — / and /index.html only; deep-linkable
+  ;; gated paths still redirect to /authorize so a returning bookmark
+  ;; lands where the user expected after auth.
+  (check "preview /"
+         (shakespeare2::preview-path-p "/") t)
+  (check "preview /index.html"
+         (shakespeare2::preview-path-p "/index.html") t)
+  (check "preview reject /ws"
+         (shakespeare2::preview-path-p "/ws") nil)
+  (check "preview reject /favicon.ico"
+         (shakespeare2::preview-path-p "/favicon.ico") nil)
   ;; admin-path-p must match /admin and /admin/* but not a prefix like
   ;; /administrator (which would route-leak the admin surface).
   (check "admin /admin"
@@ -119,6 +138,22 @@
          (shakespeare2::build-form-body '(("msg" . "hello world")))
          "msg=hello%20world"))
 
+(defun test-auth-escape-html-attr ()
+  (format t "~%Auth: escape-html-attr~%")
+  (check "plain ascii pass through"
+         (shakespeare2::escape-html-attr "https://x.example/p")
+         "https://x.example/p")
+  (check "ampersand"
+         (shakespeare2::escape-html-attr "a&b") "a&amp;b")
+  (check "double-quote (would terminate the attr)"
+         (shakespeare2::escape-html-attr "a\"b") "a&quot;b")
+  (check "single-quote"
+         (shakespeare2::escape-html-attr "a'b") "a&#39;b")
+  (check "angle brackets"
+         (shakespeare2::escape-html-attr "<x>") "&lt;x&gt;")
+  (check "empty"
+         (shakespeare2::escape-html-attr "") ""))
+
 (defun test-auth-json-string ()
   (format t "~%Auth: admin json-string helper~%")
   (check "string value"
@@ -165,5 +200,6 @@
   (test-auth-session-doomed-p)
   (test-auth-url-encode)
   (test-auth-build-form-body)
+  (test-auth-escape-html-attr)
   (test-auth-json-string)
   (test-auth-session-store-roundtrip))

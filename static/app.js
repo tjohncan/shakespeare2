@@ -32,7 +32,10 @@ let   drainTimerId = null;
 let   generationComplete = false;  // server sent EOT; drain the rest then 'done'
 
 function enqueueChars(s) {
-    for (let i = 0; i < s.length; i++) charQueue.push(s[i]);
+    // Iterate by Unicode codepoint, not UTF-16 code unit, so a 4-byte UTF-8
+    // codepoint (emoji, etc.) drains as one unit instead of two surrogate
+    // halves that would briefly render as a broken glyph between ticks.
+    for (const ch of s) charQueue.push(ch);
     startDrainIfNeeded();
 }
 
@@ -195,6 +198,11 @@ form.onsubmit = function (e) {
 copyBtn.onclick = function () {
     navigator.clipboard.writeText(output.textContent).then(function () {
         copyBtn.textContent = 'copied!';
+        setTimeout(function () { copyBtn.textContent = 'copy'; }, 1500);
+    }, function () {
+        // Insecure context, denied permission, or transient browser error.
+        // Surface a brief negative ack so the user isn't left guessing.
+        copyBtn.textContent = 'copy failed';
         setTimeout(function () { copyBtn.textContent = 'copy'; }, 1500);
     });
 };

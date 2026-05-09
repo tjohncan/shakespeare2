@@ -17,6 +17,10 @@
 (defvar *system-prompt*  nil "System prompt loaded from SPIRIT.md.")
 (defvar *app-title*      nil "App title — shown in <title> and <h1>.")
 (defvar *app-tagline*    nil "Tagline — shown under the title in the UI.")
+(defvar *backlink-url*   nil
+  "Optional URL of a parent / mothership site. When set, the public preview
+   shell renders an 'exit' link back to it (and the login modal exposes the
+   same as a secondary action). When NIL, no backlink is rendered.")
 
 (defvar *allowed-origins* nil
   "List of Origin URLs permitted to open WebSocket connections.
@@ -73,13 +77,25 @@
     (if (and v (> (length v) 0)) v default)))
 
 (defun getenv-bool (name default)
-  "Parse a boolean env var. True = \"1\", \"t\", \"true\", \"yes\" (any case).
-   Empty / unset falls through to DEFAULT."
+  "Parse a boolean env var. True = \"1\", \"t\", \"true\", \"yes\" (any case);
+   false = \"0\", \"f\", \"false\", \"no\". Empty / unset falls through to
+   DEFAULT. Unrecognized values log a warning and fall through to DEFAULT
+   too — silently demoting a security-sensitive flag (SESSION_COOKIE_SECURE,
+   etc.) on a typo is exactly the failure mode worth being loud about."
   (let ((v (getenv-or name nil)))
     (if v
         (let ((lc (string-downcase v)))
-          (or (string= lc "1") (string= lc "t")
-              (string= lc "true") (string= lc "yes")))
+          (cond
+            ((or (string= lc "1") (string= lc "t")
+                 (string= lc "true") (string= lc "yes"))
+             t)
+            ((or (string= lc "0") (string= lc "f")
+                 (string= lc "false") (string= lc "no"))
+             nil)
+            (t
+             (log-warn "~a: unrecognized boolean ~s — using default ~a"
+                       name v default)
+             default)))
         default)))
 
 (defun parse-pos-int-env (name)
@@ -90,6 +106,18 @@
     (when (and v (> (length v) 0))
       (let ((n (handler-case (parse-integer v) (error () nil))))
         (when (and n (> n 0)) n)))))
+
+(defun require-pos-int-env (name default)
+  "Parse a strictly-positive integer from env var NAME, falling back to
+   DEFAULT (a string in the same shape) when unset. Signals a clear error
+   on malformed or non-positive input rather than the raw CL parse-error
+   PARSE-INTEGER would otherwise raise — matches the friendliness of
+   REQUIRE-ENV for required string knobs."
+  (let* ((raw (getenv-or name default))
+         (n   (handler-case (parse-integer raw) (error () nil))))
+    (unless (and n (> n 0))
+      (error "~a must be a positive integer, got: ~s" name raw))
+    n))
 
 (defun parse-nonneg-float (s)
   "Parse S as a non-negative decimal number. Returns a DOUBLE-FLOAT or NIL.
@@ -110,30 +138,30 @@
       (when has-digits (/ num denom)))))
 
 (defun load-soul (path)
-  "Load the system prompt from PATH. Falls back to a minimal prompt if missing."
-  (with-open-file (s path :if-does-not-exist nil)
+  "Load the system prompt from PATH. Falls back to a minimal prompt if missing.
+   Pin the external format to UTF-8 so SPIRIT.md is interpreted the same way
+   under any container locale, and truncate the buffer to the actual char
+   count returned by READ-SEQUENCE — FILE-LENGTH on a UTF-8 character stream
+   reports bytes, so multi-byte codepoints leave trailing #\\Nul slots that
+   STRING-RIGHT-TRIM does not strip."
+  (with-open-file (s path :external-format :utf-8 :if-does-not-exist nil)
     (if s
-        (let ((buf (make-string (file-length s))))
-          (read-sequence buf s)
-          (string-right-trim '(#\Newline #\Return #\Space #\Tab) buf))
+        (let* ((buf (make-string (file-length s)))
+               (n   (read-sequence buf s)))
+          (string-right-trim '(#\Newline #\Return #\Space #\Tab)
+                             (if (= n (length buf)) buf (subseq buf 0 n))))
         (progn
           (log-warn "SPIRIT.md not found at ~a — using bare fallback" path)
           "You are a poet. Respond only with the poem."))))
 
 (defun parse-ipv4 (s)
   "Parse a dotted-decimal IPv4 string into a 4-element octet vector.
-   Signals an error on malformed input rather than returning garbage."
-  (let ((parts (loop with start = 0
-                     for i from 0 to (length s)
-                     when (or (= i (length s)) (char= (char s i) #\.))
-                       collect (parse-integer s :start start :end i)
-                       and do (setf start (1+ i)))))
-    (unless (= (length parts) 4)
-      (error "HOST must be a dotted-quad IPv4 address, got: ~s" s))
-    (dolist (p parts)
-      (unless (<= 0 p 255)
-        (error "HOST octet out of range in ~s" s)))
-    (coerce parts 'vector)))
+   Thin wrapper around the framework's PARSE-IPV4-LITERAL — that helper
+   returns NIL on any failure (wrong segment count, leading zeros,
+   non-digits, octet > 255); we re-raise as a HOST-specific error so
+   startup fails with a pointed message instead of garbage downstream."
+  (or (parse-ipv4-literal s)
+      (error "HOST must be a dotted-quad IPv4 address, got: ~s" s)))
 
 (defun split-csv (s)
   "Split a comma-separated string, trim whitespace, drop empties."
@@ -168,18 +196,22 @@
                 ((string= lvl "error") :error)
                 (t :debug))))
   (setf *server-host*   (parse-ipv4 (getenv-or "HOST" "127.0.0.1")))
-  (setf *server-port*   (parse-integer (getenv-or "PORT" "8080")))
+  (setf *server-port*   (require-pos-int-env "PORT"        "8080"))
   (setf *ollama-host*   (getenv-or "OLLAMA_HOST" "ollama"))
-  (setf *ollama-port*   (parse-integer (getenv-or "OLLAMA_PORT" "11434")))
+  (setf *ollama-port*   (require-pos-int-env "OLLAMA_PORT" "11434"))
   (setf *ollama-model*  (getenv-or "OLLAMA_MODEL" "dolphin-llama3:8b"))
   (setf *ollama-temperature* (parse-nonneg-float (uiop:getenv "OLLAMA_TEMPERATURE")))
-  (let ((pred (uiop:getenv "OLLAMA_NUM_PREDICT")))
+  ;; OLLAMA_NUM_PREDICT can legitimately be negative — Ollama treats -1 as
+  ;; "predict until end of context" and -2 as "fill context", so we cannot
+  ;; reuse the strictly-positive PARSE-POS-INT-ENV here.
+  (let ((pred (getenv-or "OLLAMA_NUM_PREDICT" nil)))
     (setf *ollama-num-predict*
-          (when (and pred (> (length pred) 0))
+          (when pred
             (handler-case (parse-integer pred) (error () nil)))))
   (setf *system-prompt* (load-soul (getenv-or "SPIRIT_PATH" "SPIRIT.md")))
   (setf *app-title*   (getenv-or "APP_TITLE"   "shakespeare2"))
   (setf *app-tagline* (getenv-or "APP_TAGLINE" "request a poem in the style of the bard"))
+  (setf *backlink-url* (getenv-or "BACKLINK_URL" nil))
   (setf *allowed-origins*
         (mapcar #'string-downcase (split-csv (uiop:getenv "ALLOWED_ORIGINS"))))
   (setf *max-input-chars*  (or (parse-pos-int-env "MAX_INPUT_CHARS")  *max-input-chars*))
@@ -203,20 +235,32 @@
   (setf *auth-client-id*       (require-env "AUTH_CLIENT_ID"))
   (setf *auth-client-key-id*   (require-env "AUTH_CLIENT_KEY_ID"))
   (setf *auth-client-secret*   (require-env "AUTH_CLIENT_SECRET"))
-  ;; Resource-server credentials are optional — only needed if we ever call /introspect.
-  (setf *auth-rs-id*           (uiop:getenv "AUTH_RS_ID"))
-  (setf *auth-rs-key-id*       (uiop:getenv "AUTH_RS_KEY_ID"))
-  (setf *auth-rs-secret*       (uiop:getenv "AUTH_RS_SECRET"))
+  ;; Resource-server credentials are optional — only needed if we ever call
+  ;; /introspect. Use GETENV-OR so an empty string (the value docker-compose's
+  ;; ${VAR-} interpolation produces when VAR is unset in .env) collapses to
+  ;; NIL — otherwise (admin-enabled-p) reads "" as truthy and routes /admin/*
+  ;; to handlers that then fail at the auth-server with bad creds.
+  (setf *auth-rs-id*           (getenv-or "AUTH_RS_ID"     nil))
+  (setf *auth-rs-key-id*       (getenv-or "AUTH_RS_KEY_ID" nil))
+  (setf *auth-rs-secret*       (getenv-or "AUTH_RS_SECRET" nil))
   ;; Endpoint paths (auth-server).
   (setf *auth-authorize-path*  (getenv-or "AUTH_AUTHORIZE_PATH"  "/authorize"))
   (setf *auth-token-path*      (getenv-or "AUTH_TOKEN_PATH"      "/token"))
   (setf *auth-introspect-path* (getenv-or "AUTH_INTROSPECT_PATH" "/introspect"))
   (setf *auth-revoke-path*     (getenv-or "AUTH_REVOKE_PATH"     "/revoke"))
-  (setf *auth-post-logout-redirect* (uiop:getenv "AUTH_POST_LOGOUT_REDIRECT"))
-  (setf *auth-scope*           (uiop:getenv "AUTH_SCOPE"))
+  ;; AUTH_POST_LOGOUT_REDIRECT must collapse "" -> NIL so the (or … "/")
+  ;; fallback in HANDLE-LOGOUT actually fires under docker-compose's ${VAR-}
+  ;; — an empty Location header otherwise bounces the browser to the same
+  ;; page instead of home.
+  (setf *auth-post-logout-redirect* (getenv-or "AUTH_POST_LOGOUT_REDIRECT" nil))
+  ;; AUTH_SCOPE is already empty-aware at the call site (BUILD-AUTHORIZE-URL
+  ;; gates on length > 0) but normalise here for symmetry.
+  (setf *auth-scope*           (getenv-or "AUTH_SCOPE" nil))
   (setf *session-cookie-name*  (getenv-or "SESSION_COOKIE_NAME" "shakespeare2_session"))
   (setf *session-cookie-secure* (getenv-bool "SESSION_COOKIE_SECURE" t))
   (setf *session-ttl-seconds*
-        (parse-integer (getenv-or "SESSION_TTL_SECONDS" "28800"))) ; 8h default
-  ;; Admin API (optional) — only useful alongside AUTH_RS_* credentials.
-  (setf *admin-api-token*      (uiop:getenv "ADMIN_API_TOKEN")))
+        (require-pos-int-env "SESSION_TTL_SECONDS" "28800")) ; 8h default
+  ;; Admin API (optional) — only useful alongside AUTH_RS_* credentials. Same
+  ;; empty-string-as-unset rule as the RS creds above: an empty token would
+  ;; otherwise constant-time-equal an empty X-Admin-Token header.
+  (setf *admin-api-token*      (getenv-or "ADMIN_API_TOKEN" nil)))

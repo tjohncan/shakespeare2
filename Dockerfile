@@ -56,7 +56,7 @@ EXPOSE 8080
 
 # The app listens on /healthz — use it as the container-level healthcheck.
 # /dev/tcp is a bash-only feature (dash doesn't support it), so invoke bash
-# explicitly — debian:bookworm-slim ships bash at /bin/bash.
+# explicitly — debian:trixie-slim ships bash at /bin/bash.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD bash -c 'exec 3<>/dev/tcp/127.0.0.1/${PORT:-8080} \
                && printf "GET /healthz HTTP/1.0\r\nHost: localhost\r\n\r\n" >&3 \

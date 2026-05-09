@@ -4,7 +4,6 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="dark">
-    <!-- frame-ancestors is set by nginx (ignored in meta). Meta CSP is defense-in-depth. -->
     <meta http-equiv="Content-Security-Policy"
           content="default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'self'; object-src 'none'">
     <title>__APP_TITLE__</title>
@@ -15,22 +14,22 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon/favicon-16x16.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png">
     <link rel="manifest" href="/favicon/site.webmanifest">
-    <script src="/app.js" defer></script>
+    <script src="/preview.js" defer></script>
 </head>
-<body>
+<body class="preview">
     <main>
         <h1>__APP_TITLE__</h1>
         <p class="subtitle">__APP_TAGLINE__</p>
-        <form id="form">
-            <input id="prompt" type="text" placeholder="a sonnet about the sea at dawn..." autofocus>
-            <button type="submit" id="action-btn">generate</button>
-            <button type="button" id="clear-btn" disabled>clear</button>
+        <form id="form" autocomplete="off">
+            <input id="prompt" type="text" placeholder="a sonnet about the sea at dawn..." disabled>
+            <button type="submit" disabled>generate</button>
         </form>
-        <div id="output"></div>
-        <button id="copy-btn" type="button">copy</button>
-        <div id="status"></div>
         __BACKLINK__
-        __LOGOUT_LINK__
     </main>
+
+    <dialog id="login-modal" aria-label="log in">
+        <a href="/login" class="modal-primary">log in</a>
+        __BACKLINK__
+    </dialog>
 </body>
 </html>

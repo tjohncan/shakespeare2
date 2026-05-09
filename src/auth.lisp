@@ -132,8 +132,10 @@
 (defun set-session-cookie (response id)
   "Attach a Set-Cookie for the session id. HttpOnly + SameSite=Lax are the
    framework defaults; Secure tracks *SESSION-COOKIE-SECURE* so local
-   HTTP testing still accepts the cookie."
-  (set-response-header response "set-cookie"
+   HTTP testing still accepts the cookie. ADD- (not SET-) so a future caller
+   that wants to emit a second cookie on the same response can — set- would
+   silently replace the previous Set-Cookie line."
+  (add-response-header response "set-cookie"
                        (build-cookie *session-cookie-name* id
                                      :secure  *session-cookie-secure*
                                      :max-age *session-ttl-seconds*))
@@ -141,7 +143,7 @@
 
 (defun clear-session-cookie (response)
   "Attach a Set-Cookie that expires the session cookie on the browser."
-  (set-response-header response "set-cookie"
+  (add-response-header response "set-cookie"
                        (delete-cookie *session-cookie-name*))
   response)
 
@@ -285,15 +287,24 @@
           (log-error "auth: /token response missing/invalid fields")
           (make-error-response 502 "Authentication failed."))
          (t
-          (store-update-plist *sessions* session-id
-                              :access-token  access
-                              :refresh-token refresh
-                              :expires-at    (+ (get-universal-time) expires)
-                              :pkce-verifier nil
-                              :oauth-state   nil)
-          (log-info "auth: session ~a authenticated (exp ~ds)"
-                    (subseq session-id 0 8) expires)
-          (make-redirect "/")))))))
+          ;; Rotate the session id at the privilege boundary. Mint a fresh
+          ;; id, store the authenticated plist under it, drop the old row.
+          ;; Defeats fixation attacks where a planted pre-auth cookie would
+          ;; otherwise carry over into the authenticated session, and is
+          ;; the OAuth2/OIDC best-practice response to a successful /token
+          ;; exchange. The new plist starts clean — no :pkce-verifier or
+          ;; :oauth-state carried forward — and :created-at resets so the
+          ;; reaper's age math reflects the post-auth lifetime.
+          (let ((new-id (random-token)))
+            (store-set *sessions* new-id
+                       (list :access-token  access
+                             :refresh-token refresh
+                             :expires-at    (+ (get-universal-time) expires)
+                             :created-at    (get-universal-time)))
+            (store-delete *sessions* session-id)
+            (log-info "auth: session ~a authenticated (rotated to ~a, exp ~ds)"
+                      (subseq session-id 0 8) (subseq new-id 0 8) expires)
+            (make-redirect "/" :set-cookie-id new-id))))))))
 
 (defun octets-to-utf8 (bytes)
   (if (null bytes)
@@ -349,15 +360,20 @@
   "Paths with public handlers (route-public)."
   (or (string= path "/callback")
       (string= path "/logout")
+      (string= path "/login")
       (string= path "/healthz")))
 
 (defun public-asset-path-p (path)
-  "Static assets that must be reachable without a session: icons,
-   the PWA manifest, robots.txt. These are loaded by <link> tags
-   without credentials, so gating them causes a cross-origin redirect
-   to /authorize that breaks browser manifest/favicon handling."
+  "Static assets that must be reachable without a session: icons, the PWA
+   manifest, robots.txt, plus the CSS and the preview-shell JS so the
+   public landing page renders correctly for un-cookied visitors. Loaded
+   by <link>/<script> tags without credentials, so gating them causes a
+   cross-origin redirect to /authorize that breaks browser
+   manifest/favicon handling and produces a flash of unstyled preview."
   (or (string= path "/favicon.ico")
       (string= path "/robots.txt")
+      (string= path "/style.css")
+      (string= path "/preview.js")
       (and (>= (length path) 9)
            (string= path "/favicon/" :end1 9))))
 

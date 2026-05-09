@@ -21,7 +21,10 @@
   (check-error "too many octets" (shakespeare2::parse-ipv4 "1.2.3.4.5"))
   (check-error "octet out of range" (shakespeare2::parse-ipv4 "127.0.0.256"))
   (check-error "non-numeric" (shakespeare2::parse-ipv4 "localhost"))
-  (check-error "empty" (shakespeare2::parse-ipv4 "")))
+  (check-error "empty" (shakespeare2::parse-ipv4 ""))
+  ;; Framework's parse-ipv4-literal rejects leading zeros (except the bare
+  ;; '0') to keep dotted-quad strictly canonical — locks the new behavior.
+  (check-error "leading zeros rejected" (shakespeare2::parse-ipv4 "127.0.0.01")))
 
 (defun test-config-split-csv ()
   (format t "~%Config: split-csv~%")

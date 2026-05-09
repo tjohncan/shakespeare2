@@ -66,6 +66,11 @@ input:read-only {
 input::placeholder {
     color: #666;
     font-style: italic;
+    /* A hair smaller than the typed-input size so the placeholder ellipsis
+       fits inside the field on narrow mobile viewports. Only the placeholder
+       is restyled — the user's typed value still renders at the input's
+       inherited 1rem. */
+    font-size: 0.9rem;
 }
 
 button {
@@ -154,16 +159,67 @@ button:disabled {
     font-style: italic;
 }
 
-.logout {
+.logout, .backlink {
     display: inline-block;
     margin-top: 2rem;
-    font-size: 0.75rem;
+    font-size: 0.85rem;
     color: #666;
     text-decoration: none;
 }
 
-.logout:hover {
+/* When both render in the authed-page footer, push the second one over so
+   they read as two distinct affordances instead of one wrapped phrase.
+   Modal scope: <dialog> only contains .backlink (preceded by .modal-primary,
+   not .logout) so this never fires there. */
+.backlink + .logout,
+.logout + .backlink {
+    margin-left: 2rem;
+}
+
+.logout:hover, .backlink:hover {
     color: #c4a35a;
+}
+
+/* --- Public preview shell ------------------------------------------------ */
+
+#login-modal {
+    background: #222;
+    color: #e0d8c8;
+    border: 1px solid #444;
+    border-radius: 6px;
+    padding: 1.5rem 2rem;
+    min-width: 16rem;
+    text-align: center;
+    /* Browsers anchor <dialog>:modal at the top by default and only
+       center horizontally — the explicit transform centers in both axes. */
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    margin: 0;
+}
+
+#login-modal::backdrop {
+    background: rgba(0, 0, 0, 0.6);
+}
+
+#login-modal .modal-primary {
+    display: inline-block;
+    background: #c4a35a;
+    color: #1a1a1a;
+    padding: 0.55rem 1.6rem;
+    border-radius: 4px;
+    font-size: 1rem;
+    text-decoration: none;
+    margin-bottom: 0.75rem;
+}
+
+#login-modal .modal-primary:hover {
+    background: #d4b36a;
+}
+
+#login-modal .backlink {
+    margin-top: 0;
+    display: block;
 }
 
 /* Short viewports (older laptops landscape, small phones) — claw back

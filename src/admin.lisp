@@ -32,8 +32,10 @@
 
 (defun admin-auth-check (request)
   "Constant-time comparison of the X-Admin-Token header to *admin-api-token*.
-   constant-time-equal folds length mismatch into the accumulator, so we do
-   not pre-check length here — that would itself leak the token length."
+   constant-time-equal short-circuits on length mismatch by design (the
+   attacker controls their own input length, so 'same vs different length'
+   is not an information gain) and runs no data-dependent branches on the
+   byte-by-byte path for same-length inputs."
   (let ((supplied (get-header request "x-admin-token")))
     (and supplied
          (constant-time-equal
