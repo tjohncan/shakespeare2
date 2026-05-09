@@ -60,7 +60,7 @@ From **web-skeleton**: WebSocket streaming (`ws-send` per token),
 
 **Different poet?** Edit `SPIRIT.md`. That's the only file that knows who
 Shakespeare is — persona, voice, line caps, output contract all live there.
-Swap in a Whitman or a Dickinson and the rest of the pipeline is unchanged.
+Swap in a Tennyson, Le Gallienne, or Jim Morrison and the rest of the pipeline is unchanged.
 
 **Different one-shot "short input → short streamed output" use case**
 (shopping list from a fridge inventory, limerick about a mood, code snippet
