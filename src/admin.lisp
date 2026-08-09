@@ -53,21 +53,32 @@
 ;;; Response + body helpers
 ;;; ---------------------------------------------------------------------------
 
-(defun make-json-response (status alist)
-  (let ((resp (make-text-response status (json-serialize alist))))
+(defun make-json-response (status payload)
+  "PAYLOAD is either a bare alist written at the call site or a JSON-OBJECT
+   parsed from an upstream reply — both shapes arrive here. Wrapping at
+   the single point they converge keeps the six literal callers writing
+   plain alists, and lets RELAY-UPSTREAM-RESPONSE pass an already-parsed
+   object straight through without unwrapping it first."
+  (let* ((obj  (if (json-object-p payload) payload (make-json-object payload)))
+         (resp (make-text-response status (json-serialize obj))))
     (set-response-header resp "content-type" "application/json; charset=utf-8")
     (set-response-header resp "cache-control" "no-store")
     resp))
 
 (defun parse-json-body (request)
-  "Parse the request body as JSON. Returns an alist on success, NIL on any
-   failure (malformed JSON, non-object top-level, empty body)."
+  "Parse the request body as JSON. Returns a JSON-OBJECT on success, NIL on
+   any failure (malformed JSON, non-object top-level, empty body).
+
+   The shape test is JSON-OBJECT-P, not LISTP. A parsed object is a struct,
+   so LISTP answers NIL for precisely the input this function exists to
+   accept: every endpoint would then read its fields out of NIL and reject
+   a well-formed body as missing, with nothing raised and nothing logged."
   (let ((body (http-request-body request)))
     (when (and body (> (length body) 0))
       (handler-case
           (let ((parsed (json-parse
                          (sb-ext:octets-to-string body :external-format :utf-8))))
-            (when (listp parsed) parsed))
+            (when (json-object-p parsed) parsed))
         (error () nil)))))
 
 (defun json-string (obj key)
@@ -91,7 +102,8 @@
    continuation — web-skeleton recognizes it and parks the inbound
    connection until the RS fetch resolves."
   (let* ((url  (concatenate 'string *auth-server-url* path))
-         (body (json-serialize (append (rs-auth-pairs) pairs))))
+         (body (json-serialize
+                (make-json-object (append (rs-auth-pairs) pairs)))))
     (defer-to-fetch method url
       :headers '(("content-type" . "application/json; charset=utf-8"))
       :body body
@@ -115,7 +127,11 @@
                                                           :external-format :utf-8)
                      (error () ""))))
          (json (handler-case (json-parse text) (error () nil))))
-    (if (listp json)
+    ;; JSON-OBJECT-P, not LISTP. A parsed object is a struct, so LISTP
+    ;; sends every successful upstream reply down the error branch below,
+    ;; reporting a working auth-server as a broken one — and the caller
+    ;; has no way to tell that verdict apart from a real upstream fault.
+    (if (json-object-p json)
         (make-json-response status json)
         (make-json-response (if (and (>= status 200) (< status 300)) 502 status)
                             `(("error" . "upstream returned non-JSON response")

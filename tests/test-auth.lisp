@@ -154,19 +154,6 @@
   (check "empty"
          (shakespeare2::escape-html-attr "") ""))
 
-(defun test-auth-json-string ()
-  (format t "~%Auth: admin json-string helper~%")
-  (check "string value"
-         (shakespeare2::json-string '(("k" . "val")) "k") "val")
-  (check "empty string rejected"
-         (shakespeare2::json-string '(("k" . "")) "k") nil)
-  (check "integer rejected"
-         (shakespeare2::json-string '(("k" . 1)) "k") nil)
-  (check "missing key"
-         (shakespeare2::json-string '() "k") nil)
-  (check "nil object"
-         (shakespeare2::json-string nil "k") nil))
-
 ;;; ---------------------------------------------------------------------------
 ;;; Session store round-trip — exercises web-skeleton's MAKE-STORE +
 ;;; STORE-UPDATE-PLIST in the same shape shakespeare2 uses at runtime.
@@ -201,5 +188,4 @@
   (test-auth-url-encode)
   (test-auth-build-form-body)
   (test-auth-escape-html-attr)
-  (test-auth-json-string)
   (test-auth-session-store-roundtrip))

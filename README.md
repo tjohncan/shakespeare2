@@ -1,19 +1,6 @@
 # shakespeare2
 
-This is primarily a showcase piece exemplifying two of my more substantial projects, simultaneously:
-
-- **[auth-server](https://github.com/tjohncan/auth-server)** —
-  an OAuth2 authorization server written in C.
-  **Not a build dependency**, not part of the Docker Compose setup,
-  and not required at runtime at all:
-  shakespeare2's auth module is feature-gated (`SHAKESPEARE2_AUTH=true`),
-  and with auth turned off, the app runs as a public toy.
-  When auth is on, shakespeare2 acts as a *confidential client*
-  (tokens live server-side; the browser only sees an opaque session cookie)
-  against any RFC-compliant authorization-code + PKCE provider.
-  The endpoint paths are env-configurable and the defaults simply match auth-server.
-  The localhost admin relay (`src/admin.lisp`) does target auth-server's specific `/api/rs/*`
-  resource-server API, but would work against any provider that happens to expose the same routes.
+This is primarily a showcase piece exemplifying two more substantial projects, simultaneously:
 
 - **[web-skeleton](https://github.com/tjohncan/web-skeleton)** —
   a web framework in Common Lisp. **Hard build dependency** —
@@ -21,6 +8,18 @@ This is primarily a showcase piece exemplifying two of my more substantial proje
   This repo is a thin application on top: routing, WebSocket streaming,
   static files, non-blocking fetch, and crypto primitives —
   all lean on the framework for the HTTP layer.
+
+- **[auth-server](https://github.com/tjohncan/auth-server)** —
+  an OAuth2 authorization server written in C.
+  **Not a build dependency**, not part of the Docker Compose setup,
+  and not required at runtime at all:
+  shakespeare2's auth module is feature-gated (`SHAKESPEARE2_AUTH=true`).
+  When auth is on, shakespeare2 acts as a *confidential client*
+  (tokens live server-side; the browser only sees an opaque session cookie)
+  against any RFC-compliant authorization-code + PKCE provider.
+  The endpoint paths are env-configurable and the defaults simply match auth-server.
+  The localhost admin relay (`src/admin.lisp`) does target auth-server's specific `/api/rs/*`
+  resource-server API, but would work against any provider that happens to expose the same routes.
 
 The app itself is just-for-fun. Type an inspiration phrase, get back a short poem
 streamed token-by-token from a local Ollama model
@@ -38,7 +37,9 @@ and the user-provisioning set `POST /api/rs/users`,
 
 From **web-skeleton**: WebSocket streaming (`ws-send` per token),
 `http-fetch` async callback (for the server-side OAuth2 token exchange),
-`http-fetch-stream` (for the Ollama NDJSON stream), `get-cookie`, and the
+`defer-to-fetch` (for the admin relay), `http-fetch-stream` (for the Ollama
+NDJSON stream), the JSON reader and writer (`json-parse`, `json-get`,
+`make-json-object`, `json-object-p`), `get-cookie`, and the
 `base64url-encode` / `sha256` / `constant-time-equal` crypto primitives.
 
 ## Layout
@@ -55,26 +56,3 @@ From **web-skeleton**: WebSocket streaming (`ws-send` per token),
 - `run.lisp`, `build.lisp` — dev REPL and production entries (both load `bootstrap.lisp` for the shared preamble)
 - `SPIRIT.md` — the system prompt defining the poet's voice
 - `.env.example` — runtime knobs with commentary
-
-## Remixing
-
-**Different poet?** Edit `SPIRIT.md`. That's the only file that knows who
-Shakespeare is — persona, voice, line caps, output contract all live there.
-Swap in a Tennyson, Le Gallienne, or Jim Morrison and the rest of the pipeline is unchanged.
-
-**Different one-shot "short input → short streamed output" use case**
-(shopping list from a fridge inventory, limerick about a mood, code snippet
-from a description, etc.). Three places are in play:
-
-1. `SPIRIT.md` — the persona and the output contract.
-2. `src/handler.lisp` — input cap, output caps (chars and lines), and any
-   per-use-case validation in `handle-ws-message`. Also the hard-coded
-   length envelope names (`*max-input-chars*`, `*max-output-chars*`,
-   `*max-output-lines*` in `src/config.lisp`) and their env equivalents in
-   `.env.example`.
-3. `static/index.html` + `static/app.js` — the input placeholder,
-   button labels, and the typewriter cadence (`CHAR_INTERVAL_MS`).
-
-Everything else — the Ollama streaming client,
-the `SOH`/`EOT`/`NAK` wire protocol, the auth integration,
-nginx hardening, healthchecks — is generic plumbing.

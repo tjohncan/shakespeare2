@@ -6,5 +6,7 @@
   :components ((:file "tests/package")
                (:file "tests/run")
                (:file "tests/test-config")
+               (:file "tests/test-ollama")
                (:file "tests/test-handler")
-               #+shakespeare2/auth (:file "tests/test-auth")))
+               #+shakespeare2/auth (:file "tests/test-auth")
+               #+shakespeare2/auth (:file "tests/test-admin")))
