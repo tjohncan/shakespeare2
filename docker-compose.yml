@@ -26,6 +26,9 @@ services:
     environment:
       HOST:         "0.0.0.0"
       PORT:         "8080"
+      # Which generator produces tokens: ollama or none.
+      # Pairs with COMPOSE_PROFILES — see .env.example.
+      LLM_SERVICE:  "${LLM_SERVICE:-ollama}"
       OLLAMA_HOST:  "ollama"
       OLLAMA_PORT:  "11434"
       OLLAMA_MODEL: "${OLLAMA_MODEL:-dolphin-llama3:8b}"
@@ -58,9 +61,19 @@ services:
     depends_on:
       ollama-bootstrap:
         condition: service_completed_successfully
+        # Not required, so LLM_SERVICE=none starts without the ollama
+        # profile at all. Without this, compose refuses to start `app`
+        # when its dependency is not in an active profile — which would
+        # make the cheap deployment impossible to express here.
+        required: false
     restart: unless-stopped
 
+  # Behind a profile: `docker compose up` runs the app alone, and
+  # `docker compose --profile ollama up` brings the model with it. The
+  # point is the deployment that pays for neither a GPU nor an idle
+  # 2-CPU container — LLM_SERVICE=none and no profile.
   ollama:
+    profiles: ["ollama"]
     image: ollama/ollama
     volumes:
       - ollama-data:/root/.ollama
@@ -77,6 +90,7 @@ services:
   # One-shot: waits for ollama to be healthy, then pulls the configured model.
   # Exits 0 on success; docker-compose promotes `app` once this finishes.
   ollama-bootstrap:
+    profiles: ["ollama"]
     image: ollama/ollama
     entrypoint: ["/bin/sh", "-c"]
     command: >

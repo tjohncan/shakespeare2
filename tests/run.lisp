@@ -31,6 +31,23 @@
               (format t "  FAIL ~a (no error signaled)~%" ,name))
      (error () (incf *tests-passed*))))
 
+(defmacro attempt (&body body)
+  "Evaluate BODY, answering its value, or the error text if it raised.
+
+   For a CHECK whose subject can raise — anything that reaches a socket or
+   parses input it did not write. An uncaught raise ends the run mid-file:
+   no failure list, no totals, and every later assertion unexecuted, which
+   makes the check unreadable under the discipline these tests are read
+   with. A raise that becomes a failed CHECK carrying the condition text
+   costs nothing and stays countable.
+
+   Taken from web-skeleton's run.lisp, which grew it for the same reason.
+   Measured here: without it, removing STREAM-GENERATE's HANDLER-CASE made
+   the suite exit 1 with no FAIL line at all — the malformed-line raise
+   killed the run rather than reporting it."
+  `(handler-case (progn ,@body)
+     (error (e) (princ-to-string e))))
+
 (defun report-suite (label)
   (format t "~%=== ~a ===~%  passed: ~d~%  failed: ~d~%"
           label *tests-passed* *tests-failed*)
@@ -46,7 +63,10 @@
         *failed-names* nil)
   (format t "~%=== shakespeare2 tests ===~%")
   (test-config)
+  (test-lines)
   (test-ollama)
+  (test-stream)
+  (test-llm)
   (test-handler)
   #+shakespeare2/auth (test-auth)
   #+shakespeare2/auth (test-admin)

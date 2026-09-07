@@ -161,10 +161,17 @@
   (format nil "~c~a" #\Nak message))
 
 (defun handle-ws-message (conn frame)
-  "Receive a poem request, stream tokens back until Ollama is done or we hit
-   one of the output caps (chars or lines), then send EOT. Errors are
-   reported via NAK and logged server-side without leaking internal
-   condition text."
+  "Receive a poem request and start a generation streaming back to CONN.
+
+   Returns as soon as the request is away — it does not wait for the poem.
+   Tokens are written from ON-TOKEN and the terminator from ON-DONE, both
+   called later from the event loop, so this function returning means only
+   that the generation began. Errors are reported via NAK and logged
+   server-side without leaking internal condition text.
+
+   The output caps stop this connection being *sent* more than its share, and
+   stop the upstream generating it too — the cap returns :STOP and the fetch
+   ends. See the note at the cap."
   (unless (= (ws-frame-opcode frame) +ws-op-text+)
     (return-from handle-ws-message nil))
   (let* ((payload (ws-frame-payload frame))
@@ -182,27 +189,76 @@
        (ws-send conn (build-ws-text *soh*))
        (let ((sent-chars 0)
              (sent-lines 0)
-             (status :ok))
-         (block stream
-           (handler-case
-               (stream-generate text
-                 (lambda (token)
-                   (let ((tchars (length token))
-                         (tlines (count #\Newline token)))
-                     (when (or (> (+ sent-chars tchars) *max-output-chars*)
-                               (> (+ sent-lines tlines) *max-output-lines*))
-                       (log-info "truncating output at ~d chars / ~d lines"
-                                 sent-chars sent-lines)
-                       (return-from stream))
-                     (incf sent-chars tchars)
-                     (incf sent-lines tlines)
-                     (ws-send conn (build-ws-text token)))))
-             (error (e)
-               (log-error "ollama error: ~a" e)
-               (setf status :failed))))
-         (ecase status
-           (:ok     (ws-send conn (build-ws-text *eot*)))
-           (:failed (ws-send conn (build-ws-text (nak "generation failed")))))))))
+             (truncated nil))
+         ;; The terminator moved into ON-DONE, and it had to. START-GENERATION
+         ;; returns as soon as the request is away now, so anything after this
+         ;; form runs before a single token has arrived — an EOT sent here
+         ;; would close the output box ahead of the poem.
+         ;;
+         ;; TRUNCATED replaces the BLOCK / RETURN-FROM the cap used to use.
+         ;; That exit unwound out of the producer, and for :OLLAMA out of the
+         ;; HTTP read, whose UNWIND-PROTECT closed the socket and stopped the
+         ;; model. There is no stack to unwind now: ON-TOKEN is called from
+         ;; the event loop, and this frame returned long ago.
+         ;;
+         ;; So the cap returns :STOP instead of unwinding, and a verdict
+         ;; travels where an exit could not. The upstream is closed, this
+         ;; connection is untouched, and the client sees what it always saw:
+         ;; the same truncated poem, the same EOT. What changed is on the
+         ;; other side — the model stops generating tokens nobody will read.
+         ;;
+         ;; TRUNCATED still exists and still guards the cap, because :STOP
+         ;; ends the fetch and not the pass: tokens already decoded from
+         ;; bytes in hand keep arriving after the verdict is given, and
+         ;; without the guard they would be sent past the cap that just
+         ;; refused them.
+         (start-generation conn text
+           :on-token
+           (lambda (token)
+             (if truncated
+                 ;; Say it again for every token that arrives after the
+                 ;; verdict. Saying it once would be enough for the framework,
+                 ;; which makes the stop sticky within a pass, but relying on
+                 ;; that would put this app's correctness inside a framework
+                 ;; detail it does not own.
+                 :stop
+                 (let ((tchars (length token))
+                       (tlines (count #\Newline token)))
+                   (cond
+                     ((or (> (+ sent-chars tchars) *max-output-chars*)
+                          (> (+ sent-lines tlines) *max-output-lines*))
+                      (setf truncated t)
+                      (log-info "truncating output at ~d chars / ~d lines ~
+                                 (stopping the upstream)"
+                                sent-chars sent-lines)
+                      :stop)
+                     (t
+                      (incf sent-chars tchars)
+                      (incf sent-lines tlines)
+                      (ws-send conn (build-ws-text token))
+                      nil)))))
+           :on-done
+           (lambda (result)
+             ;; A truncated poem is a normal ending in this app and keeps its
+             ;; EOT rather than becoming a NAK. That was true before anything
+             ;; could stop the upstream and it is true now, but it stopped
+             ;; being free: the fetch a cap stops ends through the framework's
+             ;; abort sentinel, which is the same NIL status a failed upstream
+             ;; delivers. Reported as :FAILED it would turn every truncated
+             ;; poem into "generation failed" — a working feature reporting
+             ;; itself broken.
+             ;;
+             ;; The producer answers :STOPPED instead, because the producer is
+             ;; what knows. An earlier note here predicted TRUNCATED would
+             ;; become load-bearing at this callback; it did not, and the
+             ;; reason is worth keeping. Consulting TRUNCATED would have this
+             ;; frame re-derive a fact the seam already had, and two readers
+             ;; of one fact is the shape both repos refuse.
+             (ecase result
+               (:ok      (ws-send conn (build-ws-text *eot*)))
+               (:stopped (ws-send conn (build-ws-text *eot*)))
+               (:failed  (ws-send conn (build-ws-text
+                                        (nak "generation failed")))))))))))
   nil)
 
 ;;; ---------------------------------------------------------------------------

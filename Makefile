@@ -28,8 +28,11 @@ rebuild:
 	docker compose up -d --build
 
 # Force a model re-pull (normally handled automatically by ollama-bootstrap).
+# --profile is named rather than left to compose's auto-activation, so this
+# behaves the same whether or not COMPOSE_PROFILES is set: asking to pull a
+# model is unambiguous about wanting the model.
 pull-model:
-	docker compose run --rm ollama-bootstrap
+	docker compose --profile ollama run --rm ollama-bootstrap
 
 # Drop a shell in the app container for poking around.
 shell:

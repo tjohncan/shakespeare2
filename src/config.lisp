@@ -9,6 +9,10 @@
 
 (defvar *server-host*    nil "HTTP bind address as a 4-element octet vector.")
 (defvar *server-port*    nil "HTTP listen port.")
+(defvar *llm-service*    nil
+  "Which generator produces tokens: :OLLAMA or :NONE.
+   Read from LLM_SERVICE and validated at startup, so STREAM-GENERATE's ECASE
+   cannot be reached with an unknown value by way of configuration.")
 (defvar *ollama-host*    nil "Ollama hostname.")
 (defvar *ollama-port*    nil "Ollama port.")
 (defvar *ollama-model*       nil "Model name passed to Ollama.")
@@ -177,6 +181,24 @@
           (setf start (1+ i))))
       (nreverse out))))
 
+(defun parse-llm-service (s)
+  "Parse LLM_SERVICE into a keyword, or fail startup with the valid set.
+
+   Fails at boot rather than at the first poem. A typo here is otherwise
+   invisible until someone asks for a generation, which on a deployment
+   nobody is watching means it is invisible until a visitor finds it.
+
+   When a service that needs outbound TLS is added, its validation belongs
+   here too and needs one thing this does not: TLS is a *build-time*
+   decision in bootstrap.lisp, gated today on SHAKESPEARE2_AUTH, while this
+   is a *runtime* value. An image built without libssl and configured with a
+   TLS-needing service must be refused here, at boot, rather than discovered
+   on the first request."
+  (let ((v (string-downcase (string-trim '(#\Space #\Tab) (or s "")))))
+    (cond ((string= v "ollama") :ollama)
+          ((string= v "none")   :none)
+          (t (error "LLM_SERVICE must be one of: ollama, none — got: ~s" s)))))
+
 (defun require-env (name)
   "Fetch an env var that must be non-empty. Error with a clear message otherwise."
   (let ((v (uiop:getenv name)))
@@ -197,6 +219,7 @@
                 (t :debug))))
   (setf *server-host*   (parse-ipv4 (getenv-or "HOST" "127.0.0.1")))
   (setf *server-port*   (require-pos-int-env "PORT"        "8080"))
+  (setf *llm-service*   (parse-llm-service (getenv-or "LLM_SERVICE" "ollama")))
   (setf *ollama-host*   (getenv-or "OLLAMA_HOST" "ollama"))
   (setf *ollama-port*   (require-pos-int-env "OLLAMA_PORT" "11434"))
   (setf *ollama-model*  (getenv-or "OLLAMA_MODEL" "dolphin-llama3:8b"))
@@ -219,6 +242,7 @@
   (setf *max-output-lines* (or (parse-pos-int-env "MAX_OUTPUT_LINES") *max-output-lines*))
   #+shakespeare2/auth
   (load-auth-config)
+  (log-info "config: llm-service=~a" *llm-service*)
   (log-info "config: host=~{~d~^.~} port=~d ollama=~a:~d model=~a auth=~a origins=~a"
             (coerce *server-host* 'list) *server-port*
             *ollama-host* *ollama-port* *ollama-model*

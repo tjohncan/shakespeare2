@@ -39,22 +39,43 @@
        ("stream" . t)
        ,@(when opts `(("options" . ,(make-json-object opts))))))))
 
-(defun stream-generate (user-prompt token-fn)
-  "Call TOKEN-FN for each token streamed from Ollama. Blocks the worker
-   thread until generation completes or the connection is dropped. TOKEN-FN
-   may non-locally exit to stop generation early; the HTTP socket is closed
-   by http-fetch-stream's unwind-protect.
+(defun ollama-token-from-line (line)
+  "The token LINE carries, or NIL if it carries none.
 
-   Ollama emits one JSON object per line. Lines that fail to parse or that
-   are missing a usable \"response\" field are quietly skipped — Ollama
-   sometimes sends keep-alive blanks or a final summary object."
-  (http-fetch-stream :post (ollama-url)
-    :headers '(("content-type" . "application/json"))
-    :body (json-serialize (ollama-payload user-prompt))
-    :on-line (lambda (line)
-               (when (> (length line) 0)
-                 (let* ((obj   (handler-case (json-parse line)
-                                 (error () nil)))
-                        (token (and obj (json-get obj "response"))))
-                   (when (and (stringp token) (> (length token) 0))
-                     (funcall token-fn token)))))))
+   Pure, and separated from the transport on purpose. What Ollama's lines
+   mean does not change when the way they arrive does — so this keeps its
+   own tests across the move from a blocking line reader to a chunked one,
+   and those tests go on detecting a parsing regression while the plumbing
+   underneath is replaced.
+
+   A line is skipped three ways: it fails to parse, its \"response\" is
+   absent or not a string, or its \"response\" is the empty string.
+
+   The last is the case that actually arises. The final summary object
+   carries \"response\":\"\" beside \"done\":true — the field is present and
+   empty, not missing. TEST-STREAM's corpus is a captured response and shows
+   it. An earlier version of this docstring said \"missing a usable response
+   field\", which is close enough to sound right and wrong enough that a
+   fixture written from it asserted a shape Ollama never sends.
+
+   The empty-line guard is defence rather than a described phenomenon. No
+   blank line appeared in the capture, and one capture cannot prove they
+   never occur — so the guard stays and the claim that Ollama sends them
+   does not."
+  (when (> (length line) 0)
+    (let* ((obj   (handler-case (json-parse line)
+                    (error () nil)))
+           (token (and obj (json-get obj "response"))))
+      (when (and (stringp token) (> (length token) 0))
+        token))))
+
+;;; OLLAMA-GENERATE, the blocking producer, lived here and is gone. It called
+;;; HTTP-FETCH-STREAM and held the worker for the length of a generation;
+;;; OLLAMA-START in llm.lisp does the same work through FETCH-INTO and holds
+;;; nothing. Deleted rather than kept as a second path: it had no caller left,
+;;; and a function alive only because tests still call it is a test asserting
+;;; that the code it tests exists.
+;;;
+;;; What was worth keeping from it is above. OLLAMA-TOKEN-FROM-LINE is the
+;;; half that survived the transport change untouched, which is why it was
+;;; split out before the change rather than after.
